@@ -2,61 +2,86 @@ package main
 
 import (
 	"fmt"
-	"strconv"
-	"time"
+	"log"
+	"sync/atomic"
 
 	"github.com/mdwhatcott/pipelines"
 )
 
 func main() {
-	caboose := &Caboose{}
-	pipeline := pipelines.New(
-		pipelines.WithStation(&SquareStation{}, 5, 1024),
-		pipelines.WithStation(&ItoaStation{}, 5, 1024),
-		pipelines.WithStation(caboose, 1, 1024),
+	log.SetFlags(log.Lshortfile)
+	input := make(chan any)
+	sum := new(atomic.Int64)
+	output := pipelines.New(input,
+		pipelines.Station(&SquareStation{}, 1, 1024),
+		pipelines.Station(&EvenStation{}, 1, 1024),
+		pipelines.Station(&FirstNStation{N: 20}, 1, 1024),
+		pipelines.Station(&SumStation{sum: sum}, 5, 1024),
 	)
 
-	for x := range 20 {
-		pipeline <- x + 1
+	go func() {
+		defer close(input)
+		for x := range 50 {
+			input <- x + 1
+		}
+	}()
+
+	for range output {
 	}
-	close(pipeline)
 
-	time.Sleep(time.Millisecond * 10)
-
-	fmt.Println(caboose.collected)
-}
-
-type ItoaStation struct{}
-
-func (this *ItoaStation) Station(input any, output []any) (result int) {
-	switch input := input.(type) {
-	case int:
-		output[result] = strconv.Itoa(input)
-		result++
-	default:
-		output[result] = input
-	}
-	return result
+	fmt.Println(sum.Load())
 }
 
 type SquareStation struct{}
 
-func (this *SquareStation) Station(input any, output []any) (result int) {
+func (this *SquareStation) Do(input any, output []any) (n int) {
 	switch input := input.(type) {
 	case int:
-		output[result] = input * input
-		result++
-	default:
-		output[result] = input
+		output[n] = input * input
+		n++
 	}
-	return result
+	return n
 }
 
-type Caboose struct {
-	collected []any
+type EvenStation struct{}
+
+func (this *EvenStation) Do(input any, output []any) (n int) {
+	switch input := input.(type) {
+	case int:
+		if input%2 == 0 {
+			output[n] = input
+			n++
+		}
+	}
+	return n
 }
 
-func (this *Caboose) Station(input any, _ []any) int {
-	this.collected = append(this.collected, input)
+type FirstNStation struct {
+	N       int
+	handled int
+}
+
+func (this *FirstNStation) Do(input any, output []any) (n int) {
+	if this.handled >= this.N {
+		return 0
+	}
+	switch input := input.(type) {
+	case int:
+		output[n] = input
+		this.handled++
+		n++
+	}
+	return n
+}
+
+type SumStation struct {
+	sum *atomic.Int64
+}
+
+func (this *SumStation) Do(input any, _ []any) (n int) {
+	switch input := input.(type) {
+	case int:
+		this.sum.Add(int64(input))
+	}
 	return 0
 }

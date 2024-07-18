@@ -1,29 +1,33 @@
 package pipelines
 
-import "sync"
+import (
+	"sync"
+)
+
+func New(input chan any, configs ...stationConfig) chan any {
+	for _, config := range configs {
+		output := make(chan any)
+		if config.workerCount > 1 {
+			go fanout(input, output, config)
+		} else {
+			go station(input, output, config)
+		}
+		input = output
+	}
+	return input // which is now the final output
+}
 
 type stationConfig struct {
-	action           Action
+	action           action
 	workerCount      int
 	outputBufferSize int
 }
 
-func New(configs ...stationConfig) (result chan any) {
-	input := make(chan any)
-	result = input
-	for _, config := range configs {
-		output := make(chan any)
-		go fanout(input, output, config)
-		input = output
-	}
-	return result
+type action interface {
+	Do(input any, output []any) (n int)
 }
 
-type Action interface {
-	Station(input any, output []any) (n int)
-}
-
-func WithStation(station Action, workerCount int, outputBufferSize int) stationConfig {
+func Station(station action, workerCount int, outputBufferSize int) stationConfig {
 	return stationConfig{
 		action:           station,
 		workerCount:      max(1, min(32, workerCount)),
@@ -55,7 +59,7 @@ func station(inputs, output chan any, config stationConfig) {
 	defer close(output)
 	outputs := make([]any, config.outputBufferSize)
 	for input := range inputs {
-		n := config.action.Station(input, outputs)
+		n := config.action.Do(input, outputs)
 		for o := range n {
 			output <- outputs[o]
 			outputs[o] = nil
