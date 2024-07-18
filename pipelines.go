@@ -1,8 +1,6 @@
 package pipelines
 
-import (
-	"sync"
-)
+import "sync"
 
 func New(input chan any, actions ...action) chan any {
 	for _, action := range actions {
