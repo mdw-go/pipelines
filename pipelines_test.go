@@ -1,24 +1,14 @@
-package main
+package pipelines_test
 
 import (
-	"fmt"
-	"log"
 	"sync/atomic"
+	"testing"
 
 	"github.com/mdwhatcott/pipelines"
 )
 
-func main() {
-	log.SetFlags(log.Lshortfile)
+func Test(t *testing.T) {
 	input := make(chan any)
-	sum := new(atomic.Int64)
-	output := pipelines.New(input,
-		pipelines.Station(&SquareStation{}, 1, 1024),
-		pipelines.Station(&EvenStation{}, 1, 1024),
-		pipelines.Station(&FirstNStation{N: 20}, 1, 1024),
-		pipelines.Station(&SumStation{sum: sum}, 5, 1024),
-	)
-
 	go func() {
 		defer close(input)
 		for x := range 50 {
@@ -26,10 +16,21 @@ func main() {
 		}
 	}()
 
-	for range output {
+	sum := new(atomic.Int64)
+	output := pipelines.New(input,
+		pipelines.Station(&SquareStation{}, 1, 1024),
+		pipelines.Station(&EvenStation{}, 1, 1024),
+		pipelines.Station(&FirstNStation{N: 20}, 1, 1024),
+		pipelines.Station(&SumStation{sum: sum}, 10, 1024),
+	)
+
+	for x := range output {
+		t.Log(x)
 	}
 
-	fmt.Println(sum.Load())
+	if total := sum.Load(); total != 11480 {
+		t.Error("Expected 11480, got:", total)
+	}
 }
 
 type SquareStation struct{}
@@ -78,10 +79,12 @@ type SumStation struct {
 	sum *atomic.Int64
 }
 
-func (this *SumStation) Do(input any, _ []any) (n int) {
+func (this *SumStation) Do(input any, outputs []any) (n int) {
 	switch input := input.(type) {
 	case int:
 		this.sum.Add(int64(input))
+		outputs[n] = input
+		n++
 	}
-	return 0
+	return n
 }
