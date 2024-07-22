@@ -65,25 +65,24 @@ func (this *Evens) Do(input any, output []any) (n int) {
 }
 
 type FirstN struct {
-	N       int
-	handled int
+	N       *atomic.Int64
+	handled *atomic.Int64
 }
 
 func NewFirstN(n int64) *FirstN {
-	return &FirstN{
-		N:       int(n),
-		handled: 0,
-	}
+	N := new(atomic.Int64)
+	N.Add(n)
+	return &FirstN{N: N, handled: new(atomic.Int64)}
 }
 
 func (this *FirstN) Do(input any, output []any) (n int) {
-	if this.handled >= this.N {
+	if this.handled.Load() >= this.N.Load() {
 		return 0
 	}
 	switch input := input.(type) {
 	case int:
 		n = pipelines.Append(output, n, input)
-		this.handled++
+		this.handled.Add(1)
 	}
 	return n
 }
