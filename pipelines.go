@@ -4,37 +4,44 @@ import (
 	"sync"
 )
 
-func New(input chan any, actions ...action) chan any {
-	for _, action := range actions {
+func New(input chan any, configs ...stationConfig) chan any {
+	for _, config := range configs {
 		output := make(chan any)
-		go fanout(input, output, action)
+		if config.workerCount > 1 {
+			go fanout(input, output, config)
+		} else {
+			go station(input, output, config)
+		}
 		input = output
 	}
 	return input // which is now the final output
 }
 
+type stationConfig struct {
+	action           action
+	workerCount      int
+	outputBufferSize int
+}
+
 type action interface {
 	Do(input any, output []any) (n int)
 }
-type fanoutCount interface {
-	FanoutCount() int
-}
-type maxOutputCount interface {
-	MaxOutputCount() int
+
+func Station(station action, workerCount int, outputBufferSize int) stationConfig {
+	return stationConfig{
+		action:           station,
+		workerCount:      max(1, min(32, workerCount)),
+		outputBufferSize: max(1, min(1024, outputBufferSize)),
+	}
 }
 
-func fanout(input, final chan any, action action) {
-	count, ok := action.(fanoutCount)
-	if !ok {
-		station(input, final, action)
-		return
-	}
+func fanout(input, final chan any, config stationConfig) {
 	defer close(final)
 	var outs []chan any
-	for range max(1, count.FanoutCount()) {
+	for range config.workerCount {
 		out := make(chan any)
 		outs = append(outs, out)
-		go station(input, out, action)
+		go station(input, out, config)
 	}
 	var waiter sync.WaitGroup
 	waiter.Add(len(outs))
@@ -48,16 +55,11 @@ func fanout(input, final chan any, action action) {
 		}(out)
 	}
 }
-func station(inputs, output chan any, action action) {
+func station(inputs, output chan any, config stationConfig) {
 	defer close(output)
-	maxOutput, ok := action.(maxOutputCount)
-	maxOutputCount := 64
-	if ok {
-		maxOutputCount = max(1, maxOutput.MaxOutputCount())
-	}
-	outputs := make([]any, maxOutputCount)
+	outputs := make([]any, config.outputBufferSize)
 	for input := range inputs {
-		n := action.Do(input, outputs)
+		n := config.action.Do(input, outputs)
 		for o := range n {
 			output <- outputs[o]
 			outputs[o] = nil

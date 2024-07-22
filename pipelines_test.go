@@ -18,10 +18,10 @@ func Test(t *testing.T) {
 
 	sum := new(atomic.Int64)
 	output := pipelines.New(input,
-		&SquareStation{},
-		&EvenStation{},
-		&FirstNStation{N: 20},
-		&SumStation{sum: sum},
+		pipelines.Station(&SquareStation{}, 1, 1024),
+		pipelines.Station(&EvenStation{}, 1, 1024),
+		pipelines.Station(&FirstNStation{N: 20}, 1, 1024),
+		pipelines.Station(&SumStation{sum: sum}, 10, 1024),
 	)
 
 	for x := range output {
@@ -88,6 +88,3 @@ func (this *SumStation) Do(input any, outputs []any) (n int) {
 	}
 	return n
 }
-
-func (this *SumStation) FanoutCount() int    { return 5 }
-func (this *SumStation) MaxOutputCount() int { return 1 }
