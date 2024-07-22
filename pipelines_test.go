@@ -18,11 +18,11 @@ func Test(t *testing.T) {
 
 	sum := new(atomic.Int64)
 	output := pipelines.New(input,
-		pipelines.Station(&Squares{}, 1, 1024),
-		pipelines.Station(&Evens{}, 1, 1024),
-		pipelines.Station(&FirstN{N: 20}, 1, 1024),
-		pipelines.Station(&Duplicate{}, 1, 1024),
-		pipelines.Station(&Sum{sum: sum}, 10, 1024),
+		pipelines.Station(NewSquares(), 1, 1024),
+		pipelines.Station(NewEvens(), 1, 1024),
+		pipelines.Station(NewFirstN(20), 1, 1024),
+		pipelines.Station(NewDuplicate(), 1, 1024),
+		pipelines.Station(NewSum(sum), 10, 1024),
 	)
 
 	for x := range output {
@@ -36,6 +36,10 @@ func Test(t *testing.T) {
 
 type Squares struct{}
 
+func NewSquares() *Squares {
+	return &Squares{}
+}
+
 func (this *Squares) Do(input any, output []any) (n int) {
 	switch input := input.(type) {
 	case int:
@@ -45,6 +49,10 @@ func (this *Squares) Do(input any, output []any) (n int) {
 }
 
 type Evens struct{}
+
+func NewEvens() *Evens {
+	return &Evens{}
+}
 
 func (this *Evens) Do(input any, output []any) (n int) {
 	switch input := input.(type) {
@@ -61,6 +69,13 @@ type FirstN struct {
 	handled int
 }
 
+func NewFirstN(n int64) *FirstN {
+	return &FirstN{
+		N:       int(n),
+		handled: 0,
+	}
+}
+
 func (this *FirstN) Do(input any, output []any) (n int) {
 	if this.handled >= this.N {
 		return 0
@@ -75,12 +90,20 @@ func (this *FirstN) Do(input any, output []any) (n int) {
 
 type Duplicate struct{}
 
+func NewDuplicate() *Duplicate {
+	return &Duplicate{}
+}
+
 func (this *Duplicate) Do(input any, output []any) (n int) {
 	return pipelines.Append(output, n, input, input)
 }
 
 type Sum struct {
 	sum *atomic.Int64
+}
+
+func NewSum(sum *atomic.Int64) *Sum {
+	return &Sum{sum: sum}
 }
 
 func (this *Sum) Do(input any, outputs []any) (n int) {
