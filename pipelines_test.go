@@ -18,10 +18,10 @@ func Test(t *testing.T) {
 
 	sum := new(atomic.Int64)
 	output := pipelines.New(input,
-		pipelines.Station(&SquareStation{}, 1, 1024),
-		pipelines.Station(&EvenStation{}, 1, 1024),
-		pipelines.Station(&FirstNStation{N: 20}, 1, 1024),
-		pipelines.Station(&SumStation{sum: sum}, 10, 1024),
+		pipelines.Station(&Squares{}, 1, 1024),
+		pipelines.Station(&Evens{}, 1, 1024),
+		pipelines.Station(&FirstN{N: 20}, 1, 1024),
+		pipelines.Station(&Sum{sum: sum}, 10, 1024),
 	)
 
 	for x := range output {
@@ -33,9 +33,9 @@ func Test(t *testing.T) {
 	}
 }
 
-type SquareStation struct{}
+type Squares struct{}
 
-func (this *SquareStation) Do(input any, output []any) (n int) {
+func (this *Squares) Do(input any, output []any) (n int) {
 	switch input := input.(type) {
 	case int:
 		output[n] = input * input
@@ -44,9 +44,9 @@ func (this *SquareStation) Do(input any, output []any) (n int) {
 	return n
 }
 
-type EvenStation struct{}
+type Evens struct{}
 
-func (this *EvenStation) Do(input any, output []any) (n int) {
+func (this *Evens) Do(input any, output []any) (n int) {
 	switch input := input.(type) {
 	case int:
 		if input%2 == 0 {
@@ -57,12 +57,12 @@ func (this *EvenStation) Do(input any, output []any) (n int) {
 	return n
 }
 
-type FirstNStation struct {
+type FirstN struct {
 	N       int
 	handled int
 }
 
-func (this *FirstNStation) Do(input any, output []any) (n int) {
+func (this *FirstN) Do(input any, output []any) (n int) {
 	if this.handled >= this.N {
 		return 0
 	}
@@ -75,11 +75,11 @@ func (this *FirstNStation) Do(input any, output []any) (n int) {
 	return n
 }
 
-type SumStation struct {
+type Sum struct {
 	sum *atomic.Int64
 }
 
-func (this *SumStation) Do(input any, outputs []any) (n int) {
+func (this *Sum) Do(input any, outputs []any) (n int) {
 	switch input := input.(type) {
 	case int:
 		this.sum.Add(int64(input))
