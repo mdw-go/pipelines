@@ -17,9 +17,7 @@ func (singleton) StationSingleton(station Station) option {
 	return Options.StationFactory(func() Station { return station })
 }
 func (singleton) StationFactory(stationFunc func() Station) option {
-	return func(c *config) {
-		c.stations = append(c.stations, &stationConfig{stationFunc: stationFunc})
-	}
+	return func(c *config) { c.stations = append(c.stations, &stationConfig{stationFunc: stationFunc}) }
 }
 func (singleton) WorkerCount(count int) option {
 	return func(c *config) { c.stations[len(c.stations)-1].workerCount = count }

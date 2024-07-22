@@ -40,6 +40,8 @@ func (this TLogger) Printf(format string, args ...any) {
 	this.Logf(format, args...)
 }
 
+///////////////////////////////
+
 type Squares struct{}
 
 func NewSquares() pipelines.Station {
@@ -52,6 +54,8 @@ func (this *Squares) Do(input any, output *list.List) {
 		output.PushBack(input * input)
 	}
 }
+
+///////////////////////////////
 
 type Evens struct{}
 
@@ -67,6 +71,8 @@ func (this *Evens) Do(input any, output *list.List) {
 		}
 	}
 }
+
+///////////////////////////////
 
 type FirstN struct {
 	N       *atomic.Int64
@@ -87,6 +93,8 @@ func (this *FirstN) Do(input any, output *list.List) {
 	this.handled.Add(1)
 }
 
+///////////////////////////////
+
 type Duplicate struct{}
 
 func NewDuplicate() pipelines.Station {
@@ -97,6 +105,8 @@ func (this *Duplicate) Do(input any, output *list.List) {
 	output.PushBack(input)
 	output.PushBack(input)
 }
+
+///////////////////////////////
 
 type Sum struct {
 	sum *atomic.Int64
