@@ -35,7 +35,7 @@ func Test(t *testing.T) {
 
 type TLogger struct{ *testing.T }
 
-func (this TLogger) Printf(format string, args ...interface{}) {
+func (this TLogger) Printf(format string, args ...any) {
 	this.Logf(format, args...)
 }
 
