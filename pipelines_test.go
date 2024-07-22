@@ -57,7 +57,10 @@ func (this *EvenStation) Do(input any, output []any) (n int) {
 	return n
 }
 
-type FirstNStation struct{ N, handled int }
+type FirstNStation struct {
+	N       int
+	handled int
+}
 
 func (this *FirstNStation) Do(input any, output []any) (n int) {
 	if this.handled >= this.N {
@@ -72,10 +75,10 @@ func (this *FirstNStation) Do(input any, output []any) (n int) {
 	return n
 }
 
-type SumStation struct{ sum *atomic.Int64 }
+type SumStation struct {
+	sum *atomic.Int64
+}
 
-func (this *SumStation) FanoutCount() int    { return 5 }
-func (this *SumStation) MaxOutputCount() int { return 1 }
 func (this *SumStation) Do(input any, outputs []any) (n int) {
 	switch input := input.(type) {
 	case int:
@@ -85,3 +88,6 @@ func (this *SumStation) Do(input any, outputs []any) (n int) {
 	}
 	return n
 }
+
+func (this *SumStation) FanoutCount() int    { return 5 }
+func (this *SumStation) MaxOutputCount() int { return 1 }
