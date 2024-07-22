@@ -17,26 +17,31 @@ func Test(t *testing.T) {
 	}()
 
 	sum := new(atomic.Int64)
-	output := pipelines.New(input,
-		pipelines.Station(NewSquares(), 1, 1024),
-		pipelines.Station(NewEvens(), 1, 1024),
-		pipelines.Station(NewFirstN(20), 1, 1024),
-		pipelines.Station(NewDuplicate(), 1, 1024),
-		pipelines.Station(NewSum(sum), 10, 1024),
+	listener := pipelines.New(input,
+		pipelines.Options.Logger(TLogger{T: t}),
+		pipelines.Options.StationFactory(NewSquares),
+		pipelines.Options.StationSingleton(NewFirstN(20)),
+		pipelines.Options.StationFactory(NewEvens), pipelines.Options.WorkerCount(2),
+		pipelines.Options.StationFactory(NewDuplicate), pipelines.Options.WorkerCount(5),
+		pipelines.Options.StationSingleton(NewSum(sum)),
 	)
 
-	for x := range output {
-		t.Log(x)
-	}
+	listener.Listen()
 
-	if total := sum.Load(); total != 22960 {
-		t.Error("Expected 22960, got:", total)
+	if total := sum.Load(); total != 3080 {
+		t.Error("Expected 3080, got:", total)
 	}
+}
+
+type TLogger struct{ *testing.T }
+
+func (this TLogger) Printf(format string, args ...interface{}) {
+	this.Logf(format, args...)
 }
 
 type Squares struct{}
 
-func NewSquares() *Squares {
+func NewSquares() pipelines.Station {
 	return &Squares{}
 }
 
@@ -50,7 +55,7 @@ func (this *Squares) Do(input any, output []any) (n int) {
 
 type Evens struct{}
 
-func NewEvens() *Evens {
+func NewEvens() pipelines.Station {
 	return &Evens{}
 }
 
@@ -69,7 +74,7 @@ type FirstN struct {
 	handled *atomic.Int64
 }
 
-func NewFirstN(n int64) *FirstN {
+func NewFirstN(n int64) pipelines.Station {
 	N := new(atomic.Int64)
 	N.Add(n)
 	return &FirstN{N: N, handled: new(atomic.Int64)}
@@ -89,7 +94,7 @@ func (this *FirstN) Do(input any, output []any) (n int) {
 
 type Duplicate struct{}
 
-func NewDuplicate() *Duplicate {
+func NewDuplicate() pipelines.Station {
 	return &Duplicate{}
 }
 
@@ -101,7 +106,7 @@ type Sum struct {
 	sum *atomic.Int64
 }
 
-func NewSum(sum *atomic.Int64) *Sum {
+func NewSum(sum *atomic.Int64) pipelines.Station {
 	return &Sum{sum: sum}
 }
 

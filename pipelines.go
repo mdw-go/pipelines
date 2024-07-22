@@ -2,17 +2,38 @@ package pipelines
 
 import "sync"
 
-func New(input chan any, configs ...stationConfig) chan any {
-	for _, config := range configs {
+func New(input chan any, options ...option) Listener {
+	config := new(config)
+	for _, option := range append(Options.defaults(), options...) {
+		option(config)
+	}
+	return &listener{logger: config.logger, input: input, stations: config.stations}
+}
+
+type listener struct {
+	logger   Logger
+	stations []*stationConfig
+	input    chan any
+}
+
+func (this *listener) Listen() {
+	input := this.input
+	for _, config := range this.stations {
 		output := make(chan any)
 		if config.workerCount > 1 {
-			go fanout(input, output, config)
+			go runFannedOutStation(input, output, config)
 		} else {
-			go station(input, output, config)
+			go runStation(input, output, config)
 		}
 		input = output
 	}
-	return input // which is now the final output
+	for v := range input {
+		this.logger.Printf("unhandled value at end of pipeline: %v", v)
+	}
+}
+
+func StationFunc[S any](v S) func() Station {
+	return func() Station { return any(v).(Station) }
 }
 
 func Append(outputs []any, n int, vs ...any) int {
@@ -24,30 +45,18 @@ func Append(outputs []any, n int, vs ...any) int {
 }
 
 type stationConfig struct {
-	action           action
+	stationFunc      func() Station
 	workerCount      int
 	outputBufferSize int
 }
 
-type action interface {
-	Do(input any, output []any) (n int)
-}
-
-func Station(station action, workerCount int, outputBufferSize int) stationConfig {
-	return stationConfig{
-		action:           station,
-		workerCount:      max(1, min(32, workerCount)),
-		outputBufferSize: max(1, min(1024, outputBufferSize)),
-	}
-}
-
-func fanout(input, final chan any, config stationConfig) {
+func runFannedOutStation(input, final chan any, config *stationConfig) {
 	defer close(final)
 	var outs []chan any
 	for range config.workerCount {
 		out := make(chan any)
 		outs = append(outs, out)
-		go station(input, out, config)
+		go runStation(input, out, config)
 	}
 	var waiter sync.WaitGroup
 	waiter.Add(len(outs))
@@ -61,11 +70,12 @@ func fanout(input, final chan any, config stationConfig) {
 		}(out)
 	}
 }
-func station(inputs, output chan any, config stationConfig) {
+func runStation(inputs, output chan any, config *stationConfig) {
 	defer close(output)
+	action := config.stationFunc()
 	outputs := make([]any, config.outputBufferSize)
 	for input := range inputs {
-		n := config.action.Do(input, outputs)
+		n := action.Do(input, outputs)
 		for o := range n {
 			output <- outputs[o]
 			outputs[o] = nil
