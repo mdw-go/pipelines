@@ -15,9 +15,12 @@ func New(input chan any, configs ...stationConfig) chan any {
 	return input // which is now the final output
 }
 
-func Append(outputs []any, n int, v any) int {
-	outputs[n] = v
-	return n + 1
+func Append(outputs []any, n int, vs ...any) int {
+	for _, v := range vs {
+		outputs[n] = v
+		n++
+	}
+	return n
 }
 
 type stationConfig struct {

@@ -21,6 +21,7 @@ func Test(t *testing.T) {
 		pipelines.Station(&Squares{}, 1, 1024),
 		pipelines.Station(&Evens{}, 1, 1024),
 		pipelines.Station(&FirstN{N: 20}, 1, 1024),
+		pipelines.Station(&Duplicate{}, 1, 1024),
 		pipelines.Station(&Sum{sum: sum}, 10, 1024),
 	)
 
@@ -28,8 +29,8 @@ func Test(t *testing.T) {
 		t.Log(x)
 	}
 
-	if total := sum.Load(); total != 11480 {
-		t.Error("Expected 11480, got:", total)
+	if total := sum.Load(); total != 22960 {
+		t.Error("Expected 22960, got:", total)
 	}
 }
 
@@ -70,6 +71,12 @@ func (this *FirstN) Do(input any, output []any) (n int) {
 		this.handled++
 	}
 	return n
+}
+
+type Duplicate struct{}
+
+func (this *Duplicate) Do(input any, output []any) (n int) {
+	return pipelines.Append(output, n, input, input)
 }
 
 type Sum struct {
