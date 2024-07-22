@@ -110,6 +110,5 @@ func (this *Sum) Do(input any, outputs *list.List) {
 	switch input := input.(type) {
 	case int:
 		this.sum.Add(int64(input))
-		outputs.PushBack(input)
 	}
 }
