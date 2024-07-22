@@ -15,6 +15,11 @@ func New(input chan any, configs ...stationConfig) chan any {
 	return input // which is now the final output
 }
 
+func Append(outputs []any, n int, v any) int {
+	outputs[n] = v
+	return n + 1
+}
+
 type stationConfig struct {
 	action           action
 	workerCount      int

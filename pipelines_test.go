@@ -38,8 +38,7 @@ type Squares struct{}
 func (this *Squares) Do(input any, output []any) (n int) {
 	switch input := input.(type) {
 	case int:
-		output[n] = input * input
-		n++
+		n = pipelines.Append(output, n, input*input)
 	}
 	return n
 }
@@ -50,8 +49,7 @@ func (this *Evens) Do(input any, output []any) (n int) {
 	switch input := input.(type) {
 	case int:
 		if input%2 == 0 {
-			output[n] = input
-			n++
+			n = pipelines.Append(output, n, input)
 		}
 	}
 	return n
@@ -68,9 +66,8 @@ func (this *FirstN) Do(input any, output []any) (n int) {
 	}
 	switch input := input.(type) {
 	case int:
-		output[n] = input
+		n = pipelines.Append(output, n, input)
 		this.handled++
-		n++
 	}
 	return n
 }
@@ -83,8 +80,7 @@ func (this *Sum) Do(input any, outputs []any) (n int) {
 	switch input := input.(type) {
 	case int:
 		this.sum.Add(int64(input))
-		outputs[n] = input
-		n++
+		n = pipelines.Append(outputs, n, input)
 	}
 	return n
 }
