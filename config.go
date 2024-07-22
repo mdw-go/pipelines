@@ -19,7 +19,7 @@ func (singleton) StationSingleton(station Station) option {
 func (singleton) StationFactory(stationFunc func() Station) option {
 	return func(c *config) { c.stations = append(c.stations, &stationConfig{stationFunc: stationFunc}) }
 }
-func (singleton) WorkerCount(count int) option {
+func (singleton) FanOut(count int) option {
 	return func(c *config) { c.stations[len(c.stations)-1].workerCount = count }
 }
 

@@ -21,9 +21,9 @@ func Test(t *testing.T) {
 		pipelines.Options.Logger(TLogger{T: t}),
 		pipelines.Options.StationFactory(NewSquares),
 		pipelines.Options.StationSingleton(NewFirstN(20)),
-		pipelines.Options.StationFactory(NewEvens), pipelines.Options.WorkerCount(5),
-		pipelines.Options.StationFactory(NewDuplicate), pipelines.Options.WorkerCount(5),
-		pipelines.Options.StationSingleton(NewSum(sum)), pipelines.Options.WorkerCount(5),
+		pipelines.Options.StationFactory(NewEvens), pipelines.Options.FanOut(5),
+		pipelines.Options.StationFactory(NewDuplicate), pipelines.Options.FanOut(5),
+		pipelines.Options.StationSingleton(NewSum(sum)), pipelines.Options.FanOut(5),
 	)
 
 	listener.Listen()
