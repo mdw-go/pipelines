@@ -1,8 +1,6 @@
 package pipelines
 
-import (
-	"sync"
-)
+import "sync"
 
 func New(input chan any, configs ...stationConfig) chan any {
 	for _, config := range configs {
