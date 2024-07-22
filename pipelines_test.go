@@ -1,6 +1,7 @@
 package pipelines_test
 
 import (
+	"container/list"
 	"sync/atomic"
 	"testing"
 
@@ -21,9 +22,9 @@ func Test(t *testing.T) {
 		pipelines.Options.Logger(TLogger{T: t}),
 		pipelines.Options.StationFactory(NewSquares),
 		pipelines.Options.StationSingleton(NewFirstN(20)),
-		pipelines.Options.StationFactory(NewEvens), pipelines.Options.WorkerCount(2),
+		pipelines.Options.StationFactory(NewEvens), pipelines.Options.WorkerCount(5),
 		pipelines.Options.StationFactory(NewDuplicate), pipelines.Options.WorkerCount(5),
-		pipelines.Options.StationSingleton(NewSum(sum)),
+		pipelines.Options.StationSingleton(NewSum(sum)), pipelines.Options.WorkerCount(5),
 	)
 
 	listener.Listen()
@@ -45,12 +46,11 @@ func NewSquares() pipelines.Station {
 	return &Squares{}
 }
 
-func (this *Squares) Do(input any, output []any) (n int) {
+func (this *Squares) Do(input any, output *list.List) {
 	switch input := input.(type) {
 	case int:
-		n = pipelines.Append(output, n, input*input)
+		output.PushBack(input * input)
 	}
-	return n
 }
 
 type Evens struct{}
@@ -59,14 +59,13 @@ func NewEvens() pipelines.Station {
 	return &Evens{}
 }
 
-func (this *Evens) Do(input any, output []any) (n int) {
+func (this *Evens) Do(input any, output *list.List) {
 	switch input := input.(type) {
 	case int:
 		if input%2 == 0 {
-			n = pipelines.Append(output, n, input)
+			output.PushBack(input)
 		}
 	}
-	return n
 }
 
 type FirstN struct {
@@ -80,16 +79,12 @@ func NewFirstN(n int64) pipelines.Station {
 	return &FirstN{N: N, handled: new(atomic.Int64)}
 }
 
-func (this *FirstN) Do(input any, output []any) (n int) {
+func (this *FirstN) Do(input any, output *list.List) {
 	if this.handled.Load() >= this.N.Load() {
-		return 0
+		return
 	}
-	switch input := input.(type) {
-	case int:
-		n = pipelines.Append(output, n, input)
-		this.handled.Add(1)
-	}
-	return n
+	output.PushBack(input)
+	this.handled.Add(1)
 }
 
 type Duplicate struct{}
@@ -98,8 +93,9 @@ func NewDuplicate() pipelines.Station {
 	return &Duplicate{}
 }
 
-func (this *Duplicate) Do(input any, output []any) (n int) {
-	return pipelines.Append(output, n, input, input)
+func (this *Duplicate) Do(input any, output *list.List) {
+	output.PushBack(input)
+	output.PushBack(input)
 }
 
 type Sum struct {
@@ -110,11 +106,10 @@ func NewSum(sum *atomic.Int64) pipelines.Station {
 	return &Sum{sum: sum}
 }
 
-func (this *Sum) Do(input any, outputs []any) (n int) {
+func (this *Sum) Do(input any, outputs *list.List) {
 	switch input := input.(type) {
 	case int:
 		this.sum.Add(int64(input))
-		n = pipelines.Append(outputs, n, input)
+		outputs.PushBack(input)
 	}
-	return n
 }

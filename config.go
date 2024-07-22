@@ -18,14 +18,11 @@ func (singleton) StationSingleton(station Station) option {
 }
 func (singleton) StationFactory(stationFunc func() Station) option {
 	return func(c *config) {
-		c.stations = append(c.stations, &stationConfig{stationFunc: stationFunc, workerCount: 1, outputBufferSize: 16})
+		c.stations = append(c.stations, &stationConfig{stationFunc: stationFunc})
 	}
 }
 func (singleton) WorkerCount(count int) option {
 	return func(c *config) { c.stations[len(c.stations)-1].workerCount = count }
-}
-func (singleton) OutputBufferSize(size int) option {
-	return func(c *config) { c.stations[len(c.stations)-1].outputBufferSize = size }
 }
 
 func (singleton) defaults(options ...option) []option {

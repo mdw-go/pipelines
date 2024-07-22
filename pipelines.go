@@ -1,6 +1,9 @@
 package pipelines
 
-import "sync"
+import (
+	"container/list"
+	"sync"
+)
 
 func New(input chan any, options ...option) Listener {
 	config := new(config)
@@ -32,22 +35,9 @@ func (this *listener) Listen() {
 	}
 }
 
-func StationFunc[S any](v S) func() Station {
-	return func() Station { return any(v).(Station) }
-}
-
-func Append(outputs []any, n int, vs ...any) int {
-	for _, v := range vs {
-		outputs[n] = v
-		n++
-	}
-	return n
-}
-
 type stationConfig struct {
-	stationFunc      func() Station
-	workerCount      int
-	outputBufferSize int
+	stationFunc func() Station
+	workerCount int
 }
 
 func runFannedOutStation(input, final chan any, config *stationConfig) {
@@ -73,12 +63,14 @@ func runFannedOutStation(input, final chan any, config *stationConfig) {
 func runStation(inputs, output chan any, config *stationConfig) {
 	defer close(output)
 	action := config.stationFunc()
-	outputs := make([]any, config.outputBufferSize)
+	outputs := list.New()
 	for input := range inputs {
-		n := action.Do(input, outputs)
-		for o := range n {
-			output <- outputs[o]
-			outputs[o] = nil
+		action.Do(input, outputs)
+		for this := outputs.Front(); this != nil; {
+			output <- this.Value
+			next := this.Next()
+			outputs.Remove(this)
+			this = next
 		}
 	}
 }
