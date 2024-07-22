@@ -1,7 +1,6 @@
 package pipelines_test
 
 import (
-	"container/list"
 	"sync/atomic"
 	"testing"
 
@@ -48,10 +47,10 @@ func NewSquares() pipelines.Station {
 	return &Squares{}
 }
 
-func (this *Squares) Do(input any, output *list.List) {
+func (this *Squares) Do(input any, output func(any)) {
 	switch input := input.(type) {
 	case int:
-		output.PushBack(input * input)
+		output(input * input)
 	}
 }
 
@@ -63,11 +62,11 @@ func NewEvens() pipelines.Station {
 	return &Evens{}
 }
 
-func (this *Evens) Do(input any, output *list.List) {
+func (this *Evens) Do(input any, output func(any)) {
 	switch input := input.(type) {
 	case int:
 		if input%2 == 0 {
-			output.PushBack(input)
+			output(input)
 		}
 	}
 }
@@ -85,11 +84,11 @@ func NewFirstN(n int64) pipelines.Station {
 	return &FirstN{N: N, handled: new(atomic.Int64)}
 }
 
-func (this *FirstN) Do(input any, output *list.List) {
+func (this *FirstN) Do(input any, output func(any)) {
 	if this.handled.Load() >= this.N.Load() {
 		return
 	}
-	output.PushBack(input)
+	output(input)
 	this.handled.Add(1)
 }
 
@@ -101,9 +100,9 @@ func NewDuplicate() pipelines.Station {
 	return &Duplicate{}
 }
 
-func (this *Duplicate) Do(input any, output *list.List) {
-	output.PushBack(input)
-	output.PushBack(input)
+func (this *Duplicate) Do(input any, output func(any)) {
+	output(input)
+	output(input)
 }
 
 ///////////////////////////////
@@ -116,9 +115,10 @@ func NewSum(sum *atomic.Int64) pipelines.Station {
 	return &Sum{sum: sum}
 }
 
-func (this *Sum) Do(input any, outputs *list.List) {
+func (this *Sum) Do(input any, output func(any)) {
 	switch input := input.(type) {
 	case int:
 		this.sum.Add(int64(input))
+		output(input)
 	}
 }

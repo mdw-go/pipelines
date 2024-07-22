@@ -1,9 +1,6 @@
 package pipelines
 
-import (
-	"container/list"
-	"sync"
-)
+import "sync"
 
 func New(input chan any, options ...option) Listener {
 	config := new(config)
@@ -31,7 +28,7 @@ func (this *listener) Listen() {
 		input = output
 	}
 	for v := range input {
-		this.logger.Printf("unhandled value at end of pipeline: %v", v)
+		this.logger.Printf("value at end of pipeline: %v", v)
 	}
 }
 
@@ -63,14 +60,7 @@ func runFannedOutStation(input, final chan any, config *stationConfig) {
 func runStation(inputs, output chan any, config *stationConfig) {
 	defer close(output)
 	action := config.stationFunc()
-	outputs := list.New()
 	for input := range inputs {
-		action.Do(input, outputs)
-		for this := outputs.Front(); this != nil; {
-			output <- this.Value
-			next := this.Next()
-			outputs.Remove(this)
-			this = next
-		}
+		action.Do(input, func(v any) { output <- v })
 	}
 }
