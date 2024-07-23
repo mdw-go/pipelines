@@ -5,7 +5,11 @@ import "sync"
 func New(input chan any, options ...option) Listener {
 	config := new(config)
 	config.apply(options...)
-	return &listener{logger: config.logger, input: input, stations: config.stations}
+	return &listener{
+		input:    input,
+		logger:   config.logger,
+		stations: config.stations,
+	}
 }
 
 type listener struct {
