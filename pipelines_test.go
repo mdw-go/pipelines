@@ -7,12 +7,15 @@ import (
 	"github.com/mdwhatcott/pipelines"
 )
 
+// Test a somewhat interesting pipeline example, based on this Clojure threading macro example:
+// https://clojuredocs.org/clojure.core/-%3E%3E#example-542692c8c026201cdc326a52
+// (->> (range) (map #(* % %)) (filter even?) (take 10) (reduce +))  ; output: 1140
 func Test(t *testing.T) {
 	input := make(chan any)
 	go func() {
 		defer close(input)
 		for x := range 50 {
-			input <- x + 1
+			input <- x
 		}
 	}()
 
@@ -20,16 +23,16 @@ func Test(t *testing.T) {
 	listener := pipelines.New(input,
 		pipelines.Options.Logger(TLogger{T: t}),
 		pipelines.Options.StationFactory(NewSquares),
-		pipelines.Options.StationSingleton(NewFirstN(20)),
-		pipelines.Options.StationFactory(NewEvens), pipelines.Options.FanOut(5),
-		pipelines.Options.StationFactory(NewDuplicate), pipelines.Options.FanOut(5),
+		pipelines.Options.StationFactory(NewEvens),
+		pipelines.Options.StationSingleton(NewFirstN(10)),
 		pipelines.Options.StationSingleton(NewSum(sum)), pipelines.Options.FanOut(5),
 	)
 
 	listener.Listen()
 
-	if total := sum.Load(); total != 3080 {
-		t.Error("Expected 3080, got:", total)
+	const expected = 1140
+	if total := sum.Load(); total != expected {
+		t.Errorf("Expected %d, got %d", expected, total)
 	}
 }
 
@@ -90,19 +93,6 @@ func (this *FirstN) Do(input any, output func(any)) {
 	}
 	output(input)
 	this.handled.Add(1)
-}
-
-///////////////////////////////
-
-type Duplicate struct{}
-
-func NewDuplicate() pipelines.Station {
-	return &Duplicate{}
-}
-
-func (this *Duplicate) Do(input any, output func(any)) {
-	output(input)
-	output(input)
 }
 
 ///////////////////////////////
