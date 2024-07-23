@@ -4,9 +4,7 @@ import "sync"
 
 func New(input chan any, options ...option) Listener {
 	config := new(config)
-	for _, option := range append(Options.defaults(), options...) {
-		option(config)
-	}
+	config.apply(options...)
 	return &listener{logger: config.logger, input: input, stations: config.stations}
 }
 

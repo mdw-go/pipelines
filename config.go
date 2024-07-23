@@ -4,6 +4,13 @@ type config struct {
 	logger   Logger
 	stations []*stationConfig
 }
+
+func (this *config) apply(options ...option) {
+	for _, option := range append(Options.defaults(), options...) {
+		option(this)
+	}
+}
+
 type option func(*config)
 
 var Options singleton
