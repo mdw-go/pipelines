@@ -19,9 +19,9 @@ func (this *listener) Listen() {
 	for _, config := range this.stations {
 		output := make(chan any)
 		if config.workerCount > 1 {
-			go runFannedOutStation(input, output, config)
+			go config.runFannedOutStation(input, output)
 		} else {
-			go runStation(input, output, config)
+			go config.runStation(input, output)
 		}
 		input = output
 	}
@@ -35,13 +35,13 @@ type stationConfig struct {
 	workerCount int
 }
 
-func runFannedOutStation(input, final chan any, config *stationConfig) {
+func (this *stationConfig) runFannedOutStation(input, final chan any) {
 	defer close(final)
 	var outs []chan any
-	for range config.workerCount {
+	for range this.workerCount {
 		out := make(chan any)
 		outs = append(outs, out)
-		go runStation(input, out, config)
+		go this.runStation(input, out)
 	}
 	var waiter sync.WaitGroup
 	waiter.Add(len(outs))
@@ -55,10 +55,10 @@ func runFannedOutStation(input, final chan any, config *stationConfig) {
 		}(out)
 	}
 }
-func runStation(inputs, output chan any, config *stationConfig) {
+func (this *stationConfig) runStation(input, output chan any) {
 	defer close(output)
-	action := config.stationFunc()
-	for input := range inputs {
+	action := this.stationFunc()
+	for input := range input {
 		action.Do(input, func(v any) { output <- v })
 	}
 }
