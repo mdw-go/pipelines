@@ -16,13 +16,9 @@ type listener struct {
 
 func (this *listener) Listen() {
 	input := this.input
-	for _, config := range this.stations {
+	for _, station := range this.stations {
 		output := make(chan any)
-		if config.workerCount > 1 {
-			go config.runFannedOutStation(input, output)
-		} else {
-			go config.runStation(input, output)
-		}
+		go station.run(input, output)
 		input = output
 	}
 	for v := range input {
@@ -33,6 +29,14 @@ func (this *listener) Listen() {
 type stationConfig struct {
 	stationFunc func() Station
 	workerCount int
+}
+
+func (this *stationConfig) run(input, output chan any) {
+	if this.workerCount > 1 {
+		this.runFannedOutStation(input, output)
+	} else {
+		this.runStation(input, output)
+	}
 }
 
 func (this *stationConfig) runFannedOutStation(input, final chan any) {
