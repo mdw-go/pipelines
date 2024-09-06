@@ -1,6 +1,7 @@
 package pipelines_test
 
 import (
+	"errors"
 	"sync/atomic"
 	"testing"
 
@@ -20,15 +21,17 @@ func Test(t *testing.T) {
 	}()
 
 	sum := new(atomic.Int64)
-	finalized := new(atomic.Int64)
+	closed := new(atomic.Int64)
 	logger := TLogger{T: t}
 	fanout := 5
+	catchAll := NewErrorCatch()
 	listener := pipelines.New(input,
 		pipelines.Options.Logger(logger),
 		pipelines.Options.StationFactory(NewSquares),
 		pipelines.Options.StationFactory(NewEvens),
 		pipelines.Options.StationSingleton(NewFirstN(10)),
-		pipelines.Options.StationSingleton(NewSum(sum, finalized)), pipelines.Options.FanOut(fanout),
+		pipelines.Options.StationSingleton(NewSum(sum, closed)), pipelines.Options.FanOut(fanout),
+		pipelines.Options.StationSingleton(catchAll),
 	)
 
 	listener.Listen()
@@ -37,8 +40,11 @@ func Test(t *testing.T) {
 	if total := sum.Load(); total != expected {
 		t.Errorf("Expected %d, got %d", expected, total)
 	}
-	if final := int(finalized.Load()); final != fanout {
+	if final := int(closed.Load()); final != fanout {
 		t.Errorf("Expected %d, got %d", fanout, final)
+	}
+	if len(catchAll.errors) != fanout {
+		t.Errorf("Expected %d, got %d", fanout, len(catchAll.errors))
 	}
 }
 
@@ -121,6 +127,24 @@ func (this *Sum) Do(input any, output func(any)) {
 	}
 }
 
-func (this *Sum) Finalize() {
+func (this *Sum) Close() error {
 	this.finalized.Add(1)
+	return errors.New("boink")
+}
+
+///////////////////////////////
+
+type ErrorCatch struct {
+	errors []error
+}
+
+func NewErrorCatch() *ErrorCatch {
+	return &ErrorCatch{}
+}
+
+func (this *ErrorCatch) Do(input any, output func(any)) {
+	switch input := input.(type) {
+	case error:
+		this.errors = append(this.errors, input)
+	}
 }

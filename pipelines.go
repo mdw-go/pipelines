@@ -1,6 +1,9 @@
 package pipelines
 
-import "sync"
+import (
+	"io"
+	"sync"
+)
 
 func New(input chan any, options ...option) Listener {
 	config := new(config)
@@ -66,9 +69,14 @@ func (this *stationConfig) runFannedOutStation(input, final chan any) {
 func (this *stationConfig) runStation(input, output chan any) {
 	defer close(output)
 	action := this.stationFunc()
-	finalizer, ok := action.(Finalizer)
+	closer, ok := action.(io.Closer)
 	if ok {
-		defer finalizer.Finalize()
+		defer func() {
+			err := closer.Close()
+			if err != nil {
+				output <- err
+			}
+		}()
 	}
 	for input := range input {
 		action.Do(input, func(v any) { output <- v })
