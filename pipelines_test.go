@@ -1,7 +1,7 @@
 package pipelines_test
 
 import (
-	"errors"
+	"reflect"
 	"sync/atomic"
 	"testing"
 
@@ -24,7 +24,7 @@ func Test(t *testing.T) {
 	closed := new(atomic.Int64)
 	logger := TLogger{T: t}
 	fanout := 5
-	catchAll := NewErrorCatch()
+	catchAll := NewCatchAll()
 	listener := pipelines.New(input,
 		pipelines.Options.Logger(logger),
 		pipelines.Options.StationFactory(NewSquares),
@@ -43,8 +43,8 @@ func Test(t *testing.T) {
 	if final := int(closed.Load()); final != fanout {
 		t.Errorf("Expected %d, got %d", fanout, final)
 	}
-	if len(catchAll.errors) != fanout {
-		t.Errorf("Expected %d, got %d", fanout, len(catchAll.errors))
+	if !reflect.DeepEqual(catchAll.final, []int64{1, 2, 3, 4, 5}) {
+		t.Errorf("Expected %d, got %d", []int64{1, 2, 3, 4, 5}, catchAll.final)
 	}
 }
 
@@ -127,24 +127,23 @@ func (this *Sum) Do(input any, output func(any)) {
 	}
 }
 
-func (this *Sum) Close() error {
-	this.finalized.Add(1)
-	return errors.New("boink")
+func (this *Sum) Finalize(output func(any)) {
+	output(this.finalized.Add(1))
 }
 
 ///////////////////////////////
 
-type ErrorCatch struct {
-	errors []error
+type CatchAll struct {
+	final []int64
 }
 
-func NewErrorCatch() *ErrorCatch {
-	return &ErrorCatch{}
+func NewCatchAll() *CatchAll {
+	return &CatchAll{}
 }
 
-func (this *ErrorCatch) Do(input any, output func(any)) {
+func (this *CatchAll) Do(input any, _ func(any)) {
 	switch input := input.(type) {
-	case error:
-		this.errors = append(this.errors, input)
+	case int64:
+		this.final = append(this.final, input)
 	}
 }

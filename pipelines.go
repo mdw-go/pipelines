@@ -1,7 +1,6 @@
 package pipelines
 
 import (
-	"io"
 	"sync"
 )
 
@@ -66,19 +65,15 @@ func (this *stationConfig) runFannedOutStation(input, final chan any) {
 		}(out)
 	}
 }
+
 func (this *stationConfig) runStation(input, output chan any) {
 	defer close(output)
 	action := this.stationFunc()
-	closer, ok := action.(io.Closer)
-	if ok {
-		defer func() {
-			err := closer.Close()
-			if err != nil {
-				output <- err
-			}
-		}()
+	out := func(v any) { output <- v }
+	if finalizer, ok := action.(Finalizer); ok {
+		defer finalizer.Finalize(out)
 	}
 	for input := range input {
-		action.Do(input, func(v any) { output <- v })
+		action.Do(input, out)
 	}
 }
