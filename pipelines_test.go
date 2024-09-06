@@ -20,12 +20,15 @@ func Test(t *testing.T) {
 	}()
 
 	sum := new(atomic.Int64)
+	finalized := new(atomic.Int64)
+	logger := TLogger{T: t}
+	fanout := 5
 	listener := pipelines.New(input,
-		pipelines.Options.Logger(TLogger{T: t}),
+		pipelines.Options.Logger(logger),
 		pipelines.Options.StationFactory(NewSquares),
 		pipelines.Options.StationFactory(NewEvens),
 		pipelines.Options.StationSingleton(NewFirstN(10)),
-		pipelines.Options.StationSingleton(NewSum(sum)), pipelines.Options.FanOut(5),
+		pipelines.Options.StationSingleton(NewSum(sum, finalized)), pipelines.Options.FanOut(fanout),
 	)
 
 	listener.Listen()
@@ -33,6 +36,9 @@ func Test(t *testing.T) {
 	const expected = 1140
 	if total := sum.Load(); total != expected {
 		t.Errorf("Expected %d, got %d", expected, total)
+	}
+	if final := int(finalized.Load()); final != fanout {
+		t.Errorf("Expected %d, got %d", fanout, final)
 	}
 }
 
@@ -99,11 +105,12 @@ func (this *FirstN) Do(input any, output func(any)) {
 ///////////////////////////////
 
 type Sum struct {
-	sum *atomic.Int64
+	sum       *atomic.Int64
+	finalized *atomic.Int64
 }
 
-func NewSum(sum *atomic.Int64) pipelines.Station {
-	return &Sum{sum: sum}
+func NewSum(sum, finalized *atomic.Int64) pipelines.Station {
+	return &Sum{sum: sum, finalized: finalized}
 }
 
 func (this *Sum) Do(input any, output func(any)) {
@@ -112,4 +119,8 @@ func (this *Sum) Do(input any, output func(any)) {
 		this.sum.Add(int64(input))
 		output(input)
 	}
+}
+
+func (this *Sum) Finalize() {
+	this.finalized.Add(1)
 }

@@ -66,6 +66,10 @@ func (this *stationConfig) runFannedOutStation(input, final chan any) {
 func (this *stationConfig) runStation(input, output chan any) {
 	defer close(output)
 	action := this.stationFunc()
+	finalizer, ok := action.(Finalizer)
+	if ok {
+		defer finalizer.Finalize()
+	}
 	for input := range input {
 		action.Do(input, func(v any) { output <- v })
 	}
