@@ -1,8 +1,6 @@
 package pipelines
 
-import (
-	"sync"
-)
+import "sync"
 
 func New(input chan any, options ...option) Listener {
 	config := new(config)
@@ -44,7 +42,6 @@ func (this *stationConfig) run(input, output chan any) {
 		this.runStation(input, output)
 	}
 }
-
 func (this *stationConfig) runFannedOutStation(input, final chan any) {
 	defer close(final)
 	var outs []chan any
@@ -65,7 +62,6 @@ func (this *stationConfig) runFannedOutStation(input, final chan any) {
 		}(out)
 	}
 }
-
 func (this *stationConfig) runStation(input, output chan any) {
 	defer close(output)
 	action := this.stationFunc()

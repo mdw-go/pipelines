@@ -11,6 +11,8 @@ import (
 // Test a somewhat interesting pipeline example, based on this Clojure threading macro example:
 // https://clojuredocs.org/clojure.core/-%3E%3E#example-542692c8c026201cdc326a52
 // (->> (range) (map #(* % %)) (filter even?) (take 10) (reduce +))  ; output: 1140
+// Coincidentally, using github.com/mdwhatcott/funcy/ranger you can achieve the same result as follows:
+// Reduce(op.Add, 0, Take(10, Filter(is.Even, Map(op.Square, RangeOpen(0, 1)))))
 func Test(t *testing.T) {
 	input := make(chan any)
 	go func() {
