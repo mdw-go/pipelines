@@ -2,16 +2,17 @@ package pipelines_test
 
 import (
 	"reflect"
+	"sort"
 	"sync/atomic"
 	"testing"
 
-	"github.com/mdwhatcott/pipelines"
+	"github.com/mdw-go/pipelines"
 )
 
 // Test a somewhat interesting pipeline example, based on this Clojure threading macro example:
 // https://clojuredocs.org/clojure.core/-%3E%3E#example-542692c8c026201cdc326a52
 // (->> (range) (map #(* % %)) (filter even?) (take 10) (reduce +))  ; output: 1140
-// Coincidentally, using github.com/mdwhatcott/funcy/ranger you can achieve the same result as follows:
+// Coincidentally, using github.com/mdw-go/funcy/ranger you can achieve the same result as follows:
 // Reduce(op.Add, 0, Take(10, Filter(is.Even, Map(op.Square, RangeOpen(0, 1)))))
 func Test(t *testing.T) {
 	input := make(chan any)
@@ -45,8 +46,9 @@ func Test(t *testing.T) {
 	if final := int(closed.Load()); final != fanout {
 		t.Errorf("Expected %d, got %d", fanout, final)
 	}
-	if !reflect.DeepEqual(catchAll.final, []int64{1, 2, 3, 4, 5}) {
-		t.Errorf("Expected %d, got %d", []int64{1, 2, 3, 4, 5}, catchAll.final)
+	sort.Ints(catchAll.final)
+	if !reflect.DeepEqual(catchAll.final, []int{1, 2, 3, 4, 5}) {
+		t.Errorf("Expected %d, got %d", []int{1, 2, 3, 4, 5}, catchAll.final)
 	}
 }
 
@@ -136,7 +138,7 @@ func (this *Sum) Finalize(output func(any)) {
 ///////////////////////////////
 
 type CatchAll struct {
-	final []int64
+	final []int
 }
 
 func NewCatchAll() *CatchAll {
@@ -146,6 +148,6 @@ func NewCatchAll() *CatchAll {
 func (this *CatchAll) Do(input any, _ func(any)) {
 	switch input := input.(type) {
 	case int64:
-		this.final = append(this.final, input)
+		this.final = append(this.final, int(input))
 	}
 }

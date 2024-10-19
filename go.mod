@@ -1,3 +1,3 @@
-module github.com/mdwhatcott/pipelines
+module github.com/mdw-go/pipelines
 
 go 1.22
