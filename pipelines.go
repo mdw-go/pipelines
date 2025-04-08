@@ -6,21 +6,21 @@ func New(input chan any, options ...option) Listener {
 	config := new(config)
 	config.apply(options...)
 	return &listener{
-		input:    input,
-		logger:   config.logger,
-		stations: config.stations,
+		input:  input,
+		logger: config.logger,
+		groups: config.groups,
 	}
 }
 
 type listener struct {
-	logger   Logger
-	stations []*stationConfig
-	input    chan any
+	logger Logger
+	groups []*group
+	input  chan any
 }
 
 func (this *listener) Listen() {
 	input := this.input
-	for _, station := range this.stations {
+	for _, station := range this.groups {
 		output := make(chan any)
 		go station.run(input, output)
 		input = output
@@ -30,25 +30,24 @@ func (this *listener) Listen() {
 	}
 }
 
-type stationConfig struct {
-	stationFunc func() Station
-	workerCount int
+type group struct {
+	stations []Station
 }
 
-func (this *stationConfig) run(input, output chan any) {
-	if this.workerCount > 1 {
+func (this *group) run(input, output chan any) {
+	if len(this.stations) > 1 {
 		this.runFannedOutStation(input, output)
 	} else {
-		this.runStation(input, output)
+		this.runStation(this.stations[0], input, output)
 	}
 }
-func (this *stationConfig) runFannedOutStation(input, final chan any) {
+func (this *group) runFannedOutStation(input, final chan any) {
 	defer close(final)
 	var outs []chan any
-	for range this.workerCount {
+	for _, station := range this.stations {
 		out := make(chan any)
 		outs = append(outs, out)
-		go this.runStation(input, out)
+		go this.runStation(station, input, out)
 	}
 	var waiter sync.WaitGroup
 	waiter.Add(len(outs))
@@ -62,14 +61,13 @@ func (this *stationConfig) runFannedOutStation(input, final chan any) {
 		}(out)
 	}
 }
-func (this *stationConfig) runStation(input, output chan any) {
+func (this *group) runStation(station Station, input, output chan any) {
 	defer close(output)
-	action := this.stationFunc()
 	out := func(v any) { output <- v }
-	if finalizer, ok := action.(Finalizer); ok {
+	if finalizer, ok := station.(Finalizer); ok {
 		defer finalizer.Finalize(out)
 	}
 	for input := range input {
-		action.Do(input, out)
+		station.Do(input, out)
 	}
 }

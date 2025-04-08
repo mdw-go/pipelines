@@ -9,12 +9,31 @@ import (
 	"github.com/mdw-go/pipelines"
 )
 
+func TestNoStations_AllValuesLogged(t *testing.T) {
+	input := make(chan any)
+	go func() {
+		defer close(input)
+		for x := range 10 {
+			input <- x
+		}
+	}()
+	logger := &TLogger{T: t}
+	listener := pipelines.New(input,
+		pipelines.Options.Logger(logger),
+	)
+	listener.Listen()
+
+	if logger.count != 10 {
+		t.Errorf("got %d log calls, should have 10", logger.count)
+	}
+}
+
 // Test a somewhat interesting pipeline example, based on this Clojure threading macro example:
 // https://clojuredocs.org/clojure.core/-%3E%3E#example-542692c8c026201cdc326a52
 // (->> (range) (map #(* % %)) (filter even?) (take 10) (reduce +))  ; output: 1140
 // Coincidentally, using github.com/mdw-go/funcy/ranger you can achieve the same result as follows:
 // Reduce(op.Add, 0, Take(10, Filter(is.Even, Map(op.Square, RangeOpen(0, 1)))))
-func Test(t *testing.T) {
+func TestPipelineExample(t *testing.T) {
 	input := make(chan any)
 	go func() {
 		defer close(input)
@@ -25,16 +44,23 @@ func Test(t *testing.T) {
 
 	sum := new(atomic.Int64)
 	closed := new(atomic.Int64)
-	logger := TLogger{T: t}
+	logger := &TLogger{T: t}
 	fanout := 5
 	catchAll := NewCatchAll()
 	listener := pipelines.New(input,
 		pipelines.Options.Logger(logger),
-		pipelines.Options.StationFactory(NewSquares),
-		pipelines.Options.StationFactory(NewEvens),
-		pipelines.Options.StationSingleton(NewFirstN(10)),
-		pipelines.Options.StationSingleton(NewSum(sum, closed)), pipelines.Options.FanOut(fanout),
-		pipelines.Options.StationSingleton(catchAll),
+		pipelines.Options.StationGroup(NewSquares()),
+		pipelines.Options.StationGroup(NewEvens()),
+		pipelines.Options.StationGroup(), // gets filtered
+		pipelines.Options.StationGroup(NewFirstN(10)),
+		pipelines.Options.StationGroup(
+			NewSum(sum, closed),
+			NewSum(sum, closed),
+			NewSum(sum, closed),
+			NewSum(sum, closed),
+			NewSum(sum, closed),
+		),
+		pipelines.Options.StationGroup(catchAll),
 	)
 
 	listener.Listen()
@@ -52,11 +78,15 @@ func Test(t *testing.T) {
 	}
 }
 
-type TLogger struct{ *testing.T }
+type TLogger struct {
+	*testing.T
+	count int
+}
 
-func (this TLogger) Printf(format string, args ...any) {
+func (this *TLogger) Printf(format string, args ...any) {
 	this.Helper()
 	this.Logf(format, args...)
+	this.count++
 }
 
 ///////////////////////////////

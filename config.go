@@ -1,13 +1,15 @@
 package pipelines
 
 type config struct {
-	logger   Logger
-	stations []*stationConfig
+	logger Logger
+	groups []*group
 }
 
 func (this *config) apply(options ...option) {
 	for _, option := range append(Options.defaults(), options...) {
-		option(this)
+		if option != nil {
+			option(this)
+		}
 	}
 }
 
@@ -20,16 +22,12 @@ type singleton struct{}
 func (singleton) Logger(logger Logger) option {
 	return func(c *config) { c.logger = logger }
 }
-func (singleton) StationSingleton(station Station) option {
-	return Options.StationFactory(func() Station { return station })
+func (singleton) StationGroup(stations ...Station) option {
+	if len(stations) == 0 {
+		return nil
+	}
+	return func(c *config) { c.groups = append(c.groups, &group{stations: stations}) }
 }
-func (singleton) StationFactory(stationFunc func() Station) option {
-	return func(c *config) { c.stations = append(c.stations, &stationConfig{stationFunc: stationFunc}) }
-}
-func (singleton) FanOut(count int) option {
-	return func(c *config) { c.stations[len(c.stations)-1].workerCount = count }
-}
-
 func (singleton) defaults(options ...option) []option {
 	return append([]option{
 		Options.Logger(nop{}),
@@ -38,4 +36,4 @@ func (singleton) defaults(options ...option) []option {
 
 type nop struct{}
 
-func (nop) Printf(_ string, _ ...interface{}) {}
+func (nop) Printf(_ string, _ ...any) {}
