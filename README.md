@@ -14,8 +14,10 @@ type Station interface {
 
 - The `input` is a value received from that station group's input channel.
   - Generally, a type switch is used to determine what to do with the value.
-- The `output` func is a send on that station's output channel. It is the caller's responsibility to ensure that a station group 'downstream' can handle the value being sent.
-- Generally it is a mistake for values to be sent by the last station and any such values will simply be logged by the library.
+- The `output` func is a send operation on that station's output channel.
+  - It is the caller's responsibility to ensure that a station group 'downstream' can handle the value being sent.
+  - Generally it is an oversight for values to be sent by the last station and any such values will simply be logged by the library.
+- Multiple stations in a group will result in a fan-out/fan-in (as referenced above). 
 
 Stations that also implement the following interface have one last shot at sending values before shutting down:
 
