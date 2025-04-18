@@ -20,9 +20,9 @@ type listener struct {
 
 func (this *listener) Listen() {
 	input := this.input
-	for _, station := range this.groups {
+	for _, group := range this.groups {
 		output := make(chan any)
-		go station.run(input, output)
+		go group.run(input, output)
 		input = output
 	}
 	for v := range input {
