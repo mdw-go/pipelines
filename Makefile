@@ -3,7 +3,12 @@
 VERSION := $(shell git describe)
 
 test: fmt
-	go test -count 200 -race -cover -timeout=1s -count=1 ./...
+	go test -short -count=200 -race -cover -timeout=1s ./...
 
 fmt:
 	@go version && go fmt ./... && go mod tidy
+
+test.load:
+	go test -v -race -run=TestLoad
+
+.PHONY: test fmt test.load
