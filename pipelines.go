@@ -21,7 +21,7 @@ type listener struct {
 func (this *listener) Listen() {
 	input := this.input
 	for _, group := range this.groups {
-		output := make(chan any)
+		output := make(chan any, group.bufferCapacity)
 		go group.run(input, output)
 		input = output
 	}
@@ -31,7 +31,8 @@ func (this *listener) Listen() {
 }
 
 type group struct {
-	stations []Station
+	bufferCapacity int
+	stations       []Station
 }
 
 func (this *group) run(input, output chan any) {

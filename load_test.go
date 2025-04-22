@@ -33,8 +33,8 @@ func TestLoad(t *testing.T) {
 	listener := pipelines.New(input,
 		pipelines.Options.Logger(&TLogger{T: t}),
 		pipelines.Options.StationGroup(group1...),
-		pipelines.Options.StationGroup(group2...),
-		pipelines.Options.StationGroup(NewLoadTestStation()),
+		pipelines.Options.BufferedStationGroup(1000, group2...),
+		pipelines.Options.BufferedStationGroup(1000, NewLoadTestStation()),
 		pipelines.Options.StationGroup(NewLoadTestFinalStation(t, totalItems)),
 	)
 	listener.Listen()
