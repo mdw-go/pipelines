@@ -31,8 +31,9 @@ func (this *listener) Listen() {
 }
 
 type group struct {
-	bufferCapacity int
-	stations       []Station
+	bufferCapacity        int
+	sendViaSelectCallback func(any)
+	stations              []Station
 }
 
 func (this *group) run(input, output chan any) {
@@ -64,11 +65,29 @@ func (this *group) runFannedOutStation(input, final chan any) {
 }
 func (this *group) runStation(station Station, input, output chan any) {
 	defer close(output)
-	out := func(v any) { output <- v }
+	var out func(v any)
+	if this.sendViaSelectCallback != nil {
+		out = sendViaSelect(output, this.sendViaSelectCallback)
+	} else {
+		out = blockingSend(output)
+	}
 	if finalizer, ok := station.(Finalizer); ok {
 		defer finalizer.Finalize(out)
 	}
 	for input := range input {
 		station.Do(input, out)
 	}
+}
+
+func sendViaSelect(output chan any, callback func(any)) func(any) {
+	return func(v any) {
+		select {
+		case output <- v:
+		default:
+			callback(v)
+		}
+	}
+}
+func blockingSend(output chan any) func(any) {
+	return func(v any) { output <- v }
 }

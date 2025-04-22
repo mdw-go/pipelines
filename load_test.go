@@ -1,9 +1,10 @@
 package pipelines_test
 
 import (
+	"sync/atomic"
 	"testing"
 
-	"github.com/mdw-go/pipelines"
+	"github.com/mdw-go/pipelines/v2"
 )
 
 func TestLoad(t *testing.T) {
@@ -30,12 +31,26 @@ func TestLoad(t *testing.T) {
 		}
 	}()
 
+	station3 := NewLoadTestStation()
+	station4 := NewLoadTestFinalStation(t, totalItems)
+
 	listener := pipelines.New(input,
 		pipelines.Options.Logger(&TLogger{T: t}),
-		pipelines.Options.StationGroup(group1...),
-		pipelines.Options.BufferedStationGroup(1000, group2...),
-		pipelines.Options.BufferedStationGroup(1000, NewLoadTestStation()),
-		pipelines.Options.StationGroup(NewLoadTestFinalStation(t, totalItems)),
+		pipelines.Options.StationGroup(
+			pipelines.GroupOptions.Stations(group1...),
+			pipelines.GroupOptions.SendViaSelect(station4.backdoor),
+		),
+		pipelines.Options.StationGroup(
+			pipelines.GroupOptions.Stations(group2...),
+			pipelines.GroupOptions.BufferedOutput(1000),
+		),
+		pipelines.Options.StationGroup(
+			pipelines.GroupOptions.Stations(station3),
+			pipelines.GroupOptions.BufferedOutput(1000),
+		),
+		pipelines.Options.StationGroup(
+			pipelines.GroupOptions.Stations(station4),
+		),
 	)
 	listener.Listen()
 
@@ -64,27 +79,46 @@ func (this *LoadTestStation) Do(input any, output func(any)) {
 //////////////////////////////////
 
 type LoadTestFinalStation struct {
-	t             *testing.T
-	actualCount   int
-	expectedCount int
+	t              *testing.T
+	backdoorCount  *atomic.Int64
+	processedCount *atomic.Int64
+	expectedCount  int64
 }
 
 func NewLoadTestFinalStation(t *testing.T, expectedCount int) *LoadTestFinalStation {
-	return &LoadTestFinalStation{t: t, expectedCount: expectedCount}
-}
-func (this *LoadTestFinalStation) Do(input any, output func(any)) {
-	this.actualCount++
-	if this.actualCount%100_000 == 0 {
-		this.t.Logf("progress: %d/%d (%%%d)",
-			this.actualCount,
-			this.expectedCount,
-			int(float64(this.actualCount)/float64(this.expectedCount)*100),
-		)
+	return &LoadTestFinalStation{
+		t:              t,
+		backdoorCount:  new(atomic.Int64),
+		processedCount: new(atomic.Int64),
+		expectedCount:  int64(expectedCount),
 	}
 }
+func (this *LoadTestFinalStation) Do(input any, output func(any)) {
+	actual := this.processedCount.Add(1)
+	this.progress(actual)
+}
 func (this *LoadTestFinalStation) Finalize(_ func(any)) {
-	this.t.Logf("Station finished after processing %d items", this.actualCount)
-	if this.actualCount != this.expectedCount {
-		this.t.Logf("expected %d items, got %d", this.expectedCount, this.actualCount)
+	processed := this.processedCount.Load()
+	backdoor := this.backdoorCount.Load()
+	this.t.Logf("Station finished after processing %d items (%d items were discarded)", processed, backdoor)
+	if processed+backdoor != this.expectedCount {
+		this.t.Logf("expected %d total items, got %d", this.expectedCount, processed+backdoor)
+	}
+}
+func (this *LoadTestFinalStation) backdoor(any) {
+	_ = this.backdoorCount.Add(1)
+}
+
+func (this *LoadTestFinalStation) progress(actual int64) {
+	backdoor := this.backdoorCount.Load()
+	if (actual+backdoor)%100_000 == 0 {
+		this.t.Logf("progress: %d/%d (%%%d) backdoor: %d/%d (%%%d)",
+			actual,
+			this.expectedCount,
+			int(float64(actual)/float64(this.expectedCount)*100),
+			backdoor,
+			this.expectedCount,
+			int(float64(backdoor)/float64(this.expectedCount)*100),
+		)
 	}
 }

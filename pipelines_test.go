@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/mdw-go/pipelines"
+	"github.com/mdw-go/pipelines/v2"
 )
 
 func TestNoStations_AllValuesLogged(t *testing.T) {
@@ -44,23 +44,27 @@ func TestPipelineExample(t *testing.T) {
 
 	sum := new(atomic.Int64)
 	closed := new(atomic.Int64)
-	logger := &TLogger{T: t}
-	fanout := 5
-	catchAll := NewCatchAll()
+	var (
+		squares = NewSquares()
+		evens   = NewEvens()
+		firstN  = NewFirstN(10)
+		sums    = []pipelines.Station{
+			NewSum(sum, closed),
+			NewSum(sum, closed),
+			NewSum(sum, closed),
+			NewSum(sum, closed),
+			NewSum(sum, closed),
+		}
+		catchAll = NewCatchAll()
+	)
 	listener := pipelines.New(input,
-		pipelines.Options.Logger(logger),
-		pipelines.Options.StationGroup(NewSquares()),
-		pipelines.Options.StationGroup(NewEvens()),
-		pipelines.Options.StationGroup(), // gets filtered
-		pipelines.Options.StationGroup(NewFirstN(10)),
-		pipelines.Options.StationGroup(
-			NewSum(sum, closed),
-			NewSum(sum, closed),
-			NewSum(sum, closed),
-			NewSum(sum, closed),
-			NewSum(sum, closed),
-		),
-		pipelines.Options.StationGroup(catchAll),
+		pipelines.Options.Logger(&TLogger{T: t}),
+		pipelines.Options.StationGroup(pipelines.GroupOptions.Stations(squares)),
+		pipelines.Options.StationGroup(pipelines.GroupOptions.Stations(evens)),
+		pipelines.Options.StationGroup(pipelines.GroupOptions.Stations()), // no stations, will be ignored
+		pipelines.Options.StationGroup(pipelines.GroupOptions.Stations(firstN)),
+		pipelines.Options.StationGroup(pipelines.GroupOptions.Stations(sums...)), // fan-out
+		pipelines.Options.StationGroup(pipelines.GroupOptions.Stations(catchAll)),
 	)
 
 	listener.Listen()
@@ -69,8 +73,8 @@ func TestPipelineExample(t *testing.T) {
 	if total := sum.Load(); total != expected {
 		t.Errorf("Expected %d, got %d", expected, total)
 	}
-	if final := int(closed.Load()); final != fanout {
-		t.Errorf("Expected %d, got %d", fanout, final)
+	if final := int(closed.Load()); final != len(sums) {
+		t.Errorf("Expected %d, got %d", len(sums), final)
 	}
 	sort.Ints(catchAll.final)
 	if !reflect.DeepEqual(catchAll.final, []int{1, 2, 3, 4, 5}) {

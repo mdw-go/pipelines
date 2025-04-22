@@ -8,7 +8,7 @@ test: fmt
 fmt:
 	@go version && go fmt ./... && go mod tidy
 
-test.load:
-	go test -v -race -run=TestLoad
+test.load: test
+	go test -v -race -cover -run=TestLoad
 
 .PHONY: test fmt test.load

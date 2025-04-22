@@ -15,33 +15,27 @@ func (this *config) apply(options ...option) {
 
 type option func(*config)
 
-var Options singleton
+var Options options
 
-type singleton struct{}
+type options struct{}
 
-func (singleton) Logger(logger Logger) option {
+func (options) Logger(logger Logger) option {
 	return func(c *config) { c.logger = logger }
 }
 
-func (singleton) StationGroup(stations ...Station) option {
-	return Options.BufferedStationGroup(1, stations...)
+func (options) StationGroup(options ...groupOption) option {
+	return func(c *config) {
+		group := new(group)
+		for _, option := range GroupOptions.defaults(options...) {
+			option(group)
+		}
+		if len(group.stations) > 0 {
+			c.groups = append(c.groups, group)
+		}
+	}
 }
 
-// BufferedStationGroup ensures that the provided stations fan in to a buffered channel.
-// The provided bufferCapacity will be set to 1 if a lower value is provided.
-// A bufferCapacity of 1 is equivalent to an unbuffered StationGroup.
-func (singleton) BufferedStationGroup(bufferCapacity int, stations ...Station) option {
-	if len(stations) == 0 {
-		return nil
-	}
-	return func(c *config) {
-		c.groups = append(c.groups, &group{
-			bufferCapacity: max(1, bufferCapacity),
-			stations:       stations,
-		})
-	}
-}
-func (singleton) defaults(options ...option) []option {
+func (options) defaults(options ...option) []option {
 	return append([]option{
 		Options.Logger(nop{}),
 	}, options...)
@@ -50,3 +44,41 @@ func (singleton) defaults(options ...option) []option {
 type nop struct{}
 
 func (nop) Printf(_ string, _ ...any) {}
+
+type groupOption func(*group)
+
+type groupOptions struct{}
+
+var GroupOptions groupOptions
+
+// Stations provides stations to the group. A group with no stations is considered inert and will thus be discarded.
+// Providing more than one station results in a fan-out/fan-in (see the README.md for additional details).
+func (groupOptions) Stations(stations ...Station) groupOption {
+	return func(g *group) { g.stations = stations }
+}
+
+// BufferedOutput ensures that the associated group's stations emit to a buffered channel.
+// The provided capacity will be set to 1 if a lower value is provided.
+// A capacity of 1 is equivalent to an unbuffered channel.
+func (groupOptions) BufferedOutput(capacity int) groupOption {
+	return func(g *group) { g.bufferCapacity = max(unbufferedChannelCapacity, capacity) }
+}
+
+// SendViaSelect (with a non-nil callback) employs a channel send operation as part of a select statement. The default
+// case passes items to the provided callback when the input channel to the next station is full.
+// See https://go.dev/ref/spec#Select_statements for technical details.
+// When provided a nil callback (the default) a traditional channel send operation is used, which will block when the
+// input channel to the next station is full.
+// (WARNING: May cause the entire pipeline to hang/deadlock in the case of a station with an errant infinite loop!)
+func (groupOptions) SendViaSelect(callback func(any)) groupOption {
+	return func(g *group) { g.sendViaSelectCallback = callback }
+}
+
+func (groupOptions) defaults(options ...groupOption) []groupOption {
+	return append([]groupOption{
+		GroupOptions.BufferedOutput(unbufferedChannelCapacity),
+		GroupOptions.SendViaSelect(nil),
+	}, options...)
+}
+
+const unbufferedChannelCapacity = 1
